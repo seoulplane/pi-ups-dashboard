@@ -133,6 +133,21 @@ h1 {
   gap: 0.3rem;
 }
 
+.metric .usage-normal {
+  color: var(--accent);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.metric .usage-warning {
+  color: var(--warn);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--warn) 45%, transparent);
+}
+
+.metric .usage-critical {
+  color: var(--crit);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--crit) 50%, transparent);
+}
+
 .unit {
   font-size: 0.72rem;
   color: var(--muted);

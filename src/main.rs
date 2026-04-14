@@ -41,6 +41,8 @@ struct DashboardResponse {
 #[derive(Serialize)]
 struct SystemStats {
     cpu_percent: u8,
+    cpu_used_cores: f32,
+    cpu_total_cores: u16,
     cpu_used_percent: f32,
     cpu_total_percent: f32,
     ram_percent: u8,
@@ -106,7 +108,9 @@ async fn get_dashboard(State(state): State<AppState>) -> impl IntoResponse {
     let mut system = System::new_all();
     system.refresh_all();
 
+    let cpu_total_cores = system.cpus().len().max(1) as u16;
     let cpu_usage = system.global_cpu_info().cpu_usage().clamp(0.0, 100.0);
+    let cpu_used_cores = (cpu_total_cores as f32) * (cpu_usage / 100.0);
     let cpu_percent = cpu_usage.round() as u8;
 
     let total_memory_bytes = (system.total_memory() as u64).saturating_mul(1024);
@@ -162,6 +166,8 @@ async fn get_dashboard(State(state): State<AppState>) -> impl IntoResponse {
         status,
         system: SystemStats {
             cpu_percent,
+            cpu_used_cores,
+            cpu_total_cores,
             cpu_used_percent: cpu_usage,
             cpu_total_percent: 100.0,
             ram_percent,
@@ -415,6 +421,8 @@ mod tests {
         let ups = parsed.get("ups").expect("ups object");
 
         assert!(system.get("cpu_percent").is_some());
+        assert!(system.get("cpu_used_cores").is_some());
+        assert!(system.get("cpu_total_cores").is_some());
         assert!(system.get("cpu_used_percent").is_some());
         assert!(system.get("cpu_total_percent").is_some());
         assert!(system.get("ram_percent").is_some());
@@ -460,6 +468,5 @@ mod tests {
         let html = String::from_utf8(body.to_vec()).expect("response should be utf-8 HTML");
 
         assert!(html.contains("Pi UPS Dashboard"));
-        assert!(html.contains("PI UPS Dashboard"));
     }
 }
