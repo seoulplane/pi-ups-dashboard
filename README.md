@@ -40,6 +40,21 @@ Integration-style tests also validate:
 
 ## systemd autostart
 
+### One-command install/update (recommended)
+
+This script will clone or pull the repo, build, deploy to `/opt/pi-ups-dashboard`, and enable/start the service.
+
+```bash
+chmod +x deploy/systemd/install-or-update.sh
+./deploy/systemd/install-or-update.sh
+```
+
+Optional: deploy a branch other than `main`:
+
+```bash
+./deploy/systemd/install-or-update.sh <branch>
+```
+
 1. Keep the git repo under `/opt/repos/pi-ups-dashboard` and build:
 
 ```bash
