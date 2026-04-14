@@ -4,9 +4,13 @@ const ids = {
   refreshIn: document.getElementById("refresh-in"),
   warning: document.getElementById("warning"),
   cpu: document.getElementById("cpu"),
+  cpuDetail: document.getElementById("cpu-detail"),
   ram: document.getElementById("ram"),
+  ramDetail: document.getElementById("ram-detail"),
   storage: document.getElementById("storage"),
+  storageDetail: document.getElementById("storage-detail"),
   temp: document.getElementById("temp"),
+  tempF: document.getElementById("temp-f"),
   tempTrend: document.getElementById("temp-trend"),
   download: document.getElementById("download"),
   upload: document.getElementById("upload"),
@@ -67,14 +71,23 @@ function drawSingleTrend(svg, values, strokeColor) {
   const points = buildPolylinePoints(values, width, height, min, max);
 
   svg.innerHTML = `
-    <line x1="0" y1="${height}" x2="${width}" y2="${height}" stroke="#cfd9d1" stroke-width="1" />
-    <polyline fill="none" stroke="${strokeColor}" stroke-width="2.5" points="${points}" />
+    <defs>
+      <filter id="temp-glow" x="-30%" y="-80%" width="160%" height="260%">
+        <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+        <feMerge>
+          <feMergeNode in="coloredBlur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+    <line x1="0" y1="${height}" x2="${width}" y2="${height}" stroke="#2a3352" stroke-width="1" />
+    <polyline fill="none" stroke="${strokeColor}" stroke-width="2.5" points="${points}" filter="url(#temp-glow)" />
   `;
 }
 
 function drawDualTrend(svg, firstValues, secondValues) {
   const width = 900;
-  const height = 220;
+  const height = 110;
   const all = [...firstValues, ...secondValues];
 
   if (!all.length) {
@@ -88,9 +101,18 @@ function drawDualTrend(svg, firstValues, secondValues) {
   const upPoints = buildPolylinePoints(secondValues, width, height, min, max);
 
   svg.innerHTML = `
-    <line x1="0" y1="${height}" x2="${width}" y2="${height}" stroke="#cfd9d1" stroke-width="1" />
-    <polyline fill="none" stroke="#0f4c5c" stroke-width="3" points="${downPoints}" />
-    <polyline fill="none" stroke="#1f7a4f" stroke-width="2.4" points="${upPoints}" />
+    <defs>
+      <filter id="network-glow" x="-20%" y="-60%" width="140%" height="220%">
+        <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+        <feMerge>
+          <feMergeNode in="coloredBlur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+    <line x1="0" y1="${height}" x2="${width}" y2="${height}" stroke="#2a3352" stroke-width="1" />
+    <polyline fill="none" stroke="#ff2ea6" stroke-width="3" points="${downPoints}" filter="url(#network-glow)" />
+    <polyline fill="none" stroke="#00f7ff" stroke-width="2.4" points="${upPoints}" filter="url(#network-glow)" />
   `;
 }
 
@@ -100,6 +122,18 @@ function formatRate(bytesPerSecond) {
     return `${kb.toFixed(0)} KB/s`;
   }
   return `${(kb / 1024).toFixed(2)} MB/s`;
+}
+
+function formatBytes(bytes) {
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = Math.max(0, Number(bytes) || 0);
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const precision = unitIndex <= 1 ? 0 : 1;
+  return `${value.toFixed(precision)} ${units[unitIndex]}`;
 }
 
 function applyStatus(status) {
@@ -121,9 +155,13 @@ function render(data) {
   ids.lastUpdated.textContent = `Last update: ${new Date(data.updated_at).toLocaleTimeString()}`;
 
   ids.cpu.textContent = data.system.cpu_percent;
+  ids.cpuDetail.textContent = `${Math.round(data.system.cpu_used_percent)} / ${Math.round(data.system.cpu_total_percent)} %`;
   ids.ram.textContent = data.system.ram_percent;
+  ids.ramDetail.textContent = `${formatBytes(data.system.ram_used_bytes)} / ${formatBytes(data.system.ram_total_bytes)}`;
   ids.storage.textContent = data.system.storage_percent;
+  ids.storageDetail.textContent = `${formatBytes(data.system.storage_used_bytes)} / ${formatBytes(data.system.storage_total_bytes)}`;
   ids.temp.textContent = data.system.temperature_c.toFixed(1);
+  ids.tempF.textContent = `(${((data.system.temperature_c * 9) / 5 + 32).toFixed(1)} F)`;
 
   ids.download.textContent = formatRate(data.network.download_bytes_per_sec);
   ids.upload.textContent = formatRate(data.network.upload_bytes_per_sec);
@@ -140,7 +178,7 @@ function render(data) {
   pushHistoryPoint(history.download, data.network.download_bytes_per_sec || 0);
   pushHistoryPoint(history.upload, data.network.upload_bytes_per_sec || 0);
 
-  drawSingleTrend(ids.tempTrend, history.temperature, "#b42318");
+  drawSingleTrend(ids.tempTrend, history.temperature, "#ffd43b");
   drawDualTrend(ids.networkTrend, history.download, history.upload);
 }
 
