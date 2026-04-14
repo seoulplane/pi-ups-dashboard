@@ -124,6 +124,11 @@ function formatRate(bytesPerSecond) {
   return `${(kb / 1024).toFixed(2)} MB/s`;
 }
 
+function formatMb(bytes) {
+  const mb = (Math.max(0, Number(bytes) || 0) / (1024 ** 2));
+  return `${mb.toFixed(0)} MB`;
+}
+
 function formatGb(bytes) {
   const gb = (Math.max(0, Number(bytes) || 0) / (1024 ** 3));
   return `${gb.toFixed(1)} GB`;
@@ -161,7 +166,7 @@ function render(data) {
   ids.cpu.textContent = data.system.cpu_percent;
   ids.cpuDetail.textContent = `${data.system.cpu_active_cores} Cores/${data.system.cpu_total_cores} Cores`;
   ids.ram.textContent = data.system.ram_percent;
-  ids.ramDetail.textContent = `${formatGb(data.system.ram_used_bytes)}/${formatGb(data.system.ram_total_bytes)}`;
+  ids.ramDetail.textContent = `${formatMb(data.system.ram_used_bytes)}/${formatMb(data.system.ram_total_bytes)}`;
   ids.storage.textContent = data.system.storage_percent;
   ids.storageDetail.textContent = `${formatGb(data.system.storage_used_bytes)}/${formatGb(data.system.storage_total_bytes)}`;
   ids.temp.textContent = data.system.temperature_c.toFixed(1);

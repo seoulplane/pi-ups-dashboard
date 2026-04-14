@@ -200,8 +200,8 @@ async fn sampler_task(
         let cpu_used_cores = (cpu_total_cores as f32) * (cpu_usage / 100.0);
         let cpu_percent = cpu_usage.round() as u8;
 
-        let total_memory_bytes = (system.total_memory() as u64).saturating_mul(1024);
-        let used_memory_bytes = (system.used_memory() as u64).saturating_mul(1024);
+        let total_memory_bytes = system.total_memory();
+        let used_memory_bytes = system.used_memory();
         let ram_percent = if total_memory_bytes > 0 {
             ((used_memory_bytes as f64 / total_memory_bytes as f64) * 100.0)
                 .round()
