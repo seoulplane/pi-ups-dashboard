@@ -2,6 +2,8 @@
 set -euo pipefail
 
 GITHUB_REPO="${GITHUB_REPO:-seoulplane/pi-ups-dashboard}"
+PINNED_TAG="${PINNED_TAG:-}"
+RELEASE_TAG_PATTERN="${RELEASE_TAG_PATTERN:-.*}"
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/pi-ups-dashboard}"
 BACKUP_ROOT="${BACKUP_ROOT:-/opt/pi-ups-dashboard-backups}"
 STATE_DIR="${STATE_DIR:-/var/lib/pi-ups-dashboard-updater}"
@@ -115,6 +117,10 @@ asset_binary="$(asset_for_arch)" || {
 }
 
 api_url="https://api.github.com/repos/${GITHUB_REPO}/releases/latest"
+if [[ -n "$PINNED_TAG" ]]; then
+  api_url="https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${PINNED_TAG}"
+fi
+
 tmp_dir="$(mktemp -d)"
 cleanup() {
   rm -rf "$tmp_dir"
@@ -128,6 +134,11 @@ latest_tag="$(extract_tag_name "$release_json")"
 if [[ -z "$latest_tag" ]]; then
   echo "Unable to determine latest release tag from GitHub API"
   exit 1
+fi
+
+if [[ ! "$latest_tag" =~ $RELEASE_TAG_PATTERN ]]; then
+  echo "Latest release tag '$latest_tag' does not match RELEASE_TAG_PATTERN '$RELEASE_TAG_PATTERN'"
+  exit 0
 fi
 
 as_root mkdir -p "$STATE_DIR"

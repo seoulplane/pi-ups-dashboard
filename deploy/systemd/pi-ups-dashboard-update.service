@@ -6,6 +6,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/repos/pi-ups-dashboard
+EnvironmentFile=-/etc/default/pi-ups-dashboard-updater
 ExecStart=/opt/repos/pi-ups-dashboard/deploy/systemd/update-from-release.sh
 
 [Install]

@@ -61,6 +61,7 @@ Updater files:
 - `deploy/systemd/pi-ups-dashboard-update.service`
 - `deploy/systemd/pi-ups-dashboard-update.timer`
 - `deploy/systemd/install-update-timer.sh`
+- `deploy/systemd/pi-ups-dashboard-updater.env.example`
 
 Install the updater timer on Pi:
 
@@ -76,6 +77,20 @@ Run an immediate update check:
 sudo systemctl start pi-ups-dashboard-update.service
 sudo systemctl status pi-ups-dashboard-update.service --no-pager
 ```
+
+Optional: set update channel/pinning controls:
+
+```bash
+sudo cp /opt/repos/pi-ups-dashboard/deploy/systemd/pi-ups-dashboard-updater.env.example /etc/default/pi-ups-dashboard-updater
+sudo nano /etc/default/pi-ups-dashboard-updater
+sudo systemctl daemon-reload
+sudo systemctl restart pi-ups-dashboard-update.timer
+```
+
+Useful options in `/etc/default/pi-ups-dashboard-updater`:
+
+- `RELEASE_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'` for stable-only SemVer tags
+- `PINNED_TAG=v1.2.3` to lock to a specific release
 
 ## Notes
 
