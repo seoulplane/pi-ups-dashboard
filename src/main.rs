@@ -443,6 +443,37 @@ mod tests {
         assert!(ups.get("runtime_minutes").is_some());
         assert!(ups.get("last_transfer").is_some());
         assert!(ups.get("source").is_some());
+
+        let cpu_total_cores = system
+            .get("cpu_total_cores")
+            .and_then(Value::as_u64)
+            .expect("cpu_total_cores should be numeric");
+        let cpu_used_cores = system
+            .get("cpu_used_cores")
+            .and_then(Value::as_f64)
+            .expect("cpu_used_cores should be numeric");
+        let ram_total_bytes = system
+            .get("ram_total_bytes")
+            .and_then(Value::as_u64)
+            .expect("ram_total_bytes should be numeric");
+        let ram_used_bytes = system
+            .get("ram_used_bytes")
+            .and_then(Value::as_u64)
+            .expect("ram_used_bytes should be numeric");
+        let storage_total_bytes = system
+            .get("storage_total_bytes")
+            .and_then(Value::as_u64)
+            .expect("storage_total_bytes should be numeric");
+        let storage_used_bytes = system
+            .get("storage_used_bytes")
+            .and_then(Value::as_u64)
+            .expect("storage_used_bytes should be numeric");
+
+        assert!(cpu_total_cores >= 1);
+        assert!(cpu_used_cores >= 0.0);
+        assert!(cpu_used_cores <= cpu_total_cores as f64 + 0.01);
+        assert!(ram_total_bytes >= ram_used_bytes);
+        assert!(storage_total_bytes >= storage_used_bytes);
     }
 
     #[tokio::test]
@@ -468,5 +499,10 @@ mod tests {
         let html = String::from_utf8(body.to_vec()).expect("response should be utf-8 HTML");
 
         assert!(html.contains("Pi UPS Dashboard"));
+        assert!(html.contains("id=\"cpu-detail\""));
+        assert!(html.contains("id=\"ram-detail\""));
+        assert!(html.contains("id=\"storage-detail\""));
+        assert!(html.contains("id=\"temp-f\""));
+        assert!(!html.contains("PI UPS Dashboard"));
     }
 }

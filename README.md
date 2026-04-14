@@ -170,6 +170,21 @@ It auto-selects a binary based on CPU architecture. You can also pass a binary p
 ./deploy/systemd/deploy-precompiled.sh /opt/repos/pi-ups-dashboard/binaries/pi-ups-dashboard-linux-aarch64-musl
 ```
 
+### Option 3: deploy binary + refresh web pages
+
+This script is a focused deploy path that updates the executable and syncs web assets (`static/`) in one step.
+
+```bash
+chmod +x deploy/systemd/deploy-binary-and-web.sh
+./deploy/systemd/deploy-binary-and-web.sh
+```
+
+Optional explicit binary path:
+
+```bash
+./deploy/systemd/deploy-binary-and-web.sh /opt/repos/pi-ups-dashboard/binaries/pi-ups-dashboard-linux-aarch64-musl
+```
+
 1. Keep the git repo under `/opt/repos/pi-ups-dashboard` and build:
 
 ```bash
