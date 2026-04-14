@@ -72,6 +72,21 @@ Optional: deploy a branch other than `main`:
 ./deploy/systemd/install-or-update.sh <branch>
 ```
 
+### Option 2: deploy precompiled binary (no Cargo needed on Pi)
+
+This script deploys a binary from `binaries/`, copies static/deploy files, and enables/starts the service.
+
+```bash
+chmod +x deploy/systemd/deploy-precompiled.sh
+./deploy/systemd/deploy-precompiled.sh
+```
+
+It auto-selects a binary based on CPU architecture. You can also pass a binary path explicitly:
+
+```bash
+./deploy/systemd/deploy-precompiled.sh /opt/repos/pi-ups-dashboard/binaries/pi-ups-dashboard-linux-aarch64-musl
+```
+
 1. Keep the git repo under `/opt/repos/pi-ups-dashboard` and build:
 
 ```bash
