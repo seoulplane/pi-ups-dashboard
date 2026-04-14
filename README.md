@@ -40,21 +40,26 @@ Integration-style tests also validate:
 
 ## systemd autostart
 
-1. Build and copy binary:
+1. Keep the git repo under `/opt/repos/pi-ups-dashboard` and build:
 
 ```bash
+sudo mkdir -p /opt/repos
+cd /opt/repos
+git clone https://github.com/seoulplane/pi-ups-dashboard.git
+cd pi-ups-dashboard
 cargo build --release
-sudo mkdir -p /opt/pi-ups-dashboard
-sudo cp target/release/pi-ups-dashboard /opt/pi-ups-dashboard/pi-ups-dashboard
-sudo cp -R deploy /opt/pi-ups-dashboard/
 ```
 
-2. Install and start service:
+2. Deploy to `/opt/pi-ups-dashboard` and start service:
 
 ```bash
-cd /opt/pi-ups-dashboard
+cd /opt/repos/pi-ups-dashboard
 chmod +x deploy/systemd/install-service.sh
 ./deploy/systemd/install-service.sh
 ```
+
+The installer copies:
+- binary: `/opt/repos/pi-ups-dashboard/target/release/pi-ups-dashboard` -> `/opt/pi-ups-dashboard/pi-ups-dashboard`
+- service files: `/opt/repos/pi-ups-dashboard/deploy` -> `/opt/pi-ups-dashboard/deploy`
 
 Service unit file: `deploy/systemd/pi-ups-dashboard.service`
