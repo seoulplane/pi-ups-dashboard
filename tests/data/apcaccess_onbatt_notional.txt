@@ -1,0 +1,14 @@
+APC      : 001,052,1201
+DATE     : 2026-04-13 19:05:11 +0000
+HOSTNAME : pi-zero2w
+UPSNAME  : OFFICE-UPS
+STATUS   : ONBATT
+LINEV    : 0.0 Volts
+LOADPCT  : 41.0 Percent
+BCHARGE  : 18.2 Percent
+TIMELEFT : 5.9 Minutes
+LASTXFER : Automatic or explicit self test
+NUMXFERS : 3
+TONBATT  : 367 Seconds
+CUMONBATT: 724 Seconds
+END APC  : 2026-04-13 19:05:11 +0000

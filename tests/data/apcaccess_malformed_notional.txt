@@ -1,0 +1,6 @@
+STATUS   : ONLINE
+LINEV    : NaN Volts
+LOADPCT  : ??? Percent
+BCHARGE  : ninety
+TIMELEFT : not_a_number
+LASTXFER : Communication lost and restored

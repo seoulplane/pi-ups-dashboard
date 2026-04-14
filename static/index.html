@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pi UPS Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <main class="page-wrapper" aria-label="Pi and APC monitoring dashboard">
+      <header class="top-bar card">
+        <div class="title-wrap">
+          <p class="eyebrow">Raspberry Pi Zero 2W</p>
+          <h1>Power and System Telemetry</h1>
+        </div>
+        <div class="status-wrap">
+          <span id="global-status" class="status-badge healthy">Healthy</span>
+          <span id="last-updated" class="meta-chip" aria-live="polite">Last update: --</span>
+          <span id="refresh-in" class="meta-chip">Next refresh: 30s</span>
+        </div>
+      </header>
+
+      <section class="kpi-grid" aria-label="System metrics">
+        <article class="metric-card card">
+          <h2>CPU Usage</h2>
+          <p class="metric"><span id="cpu">--</span><span class="unit">%</span></p>
+        </article>
+        <article class="metric-card card">
+          <h2>RAM Usage</h2>
+          <p class="metric"><span id="ram">--</span><span class="unit">%</span></p>
+        </article>
+        <article class="metric-card card">
+          <h2>Storage Usage</h2>
+          <p class="metric"><span id="storage">--</span><span class="unit">%</span></p>
+        </article>
+        <article class="metric-card card">
+          <h2>Temperature</h2>
+          <p class="metric"><span id="temp">--</span><span class="unit"> C</span></p>
+          <svg
+            id="temp-trend"
+            class="mini-trend"
+            viewBox="0 0 320 72"
+            role="img"
+            aria-label="Temperature history trend"
+          ></svg>
+        </article>
+      </section>
+
+      <section class="card network-panel" aria-label="Network usage rates">
+        <div class="section-head">
+          <h2>Network Throughput</h2>
+          <p class="section-sub">Upload and download rates</p>
+        </div>
+        <div class="network-values">
+          <p>Download <strong id="download">--</strong></p>
+          <p>Upload <strong id="upload">--</strong></p>
+        </div>
+        <svg
+          id="network-trend"
+          class="network-trend"
+          viewBox="0 0 900 220"
+          role="img"
+          aria-label="Network upload and download history trend"
+        ></svg>
+        <p class="trend-legend">
+          <span class="legend-chip down">Download</span>
+          <span class="legend-chip up">Upload</span>
+        </p>
+      </section>
+
+      <section class="card ups-panel" aria-label="APC UPS statistics">
+        <div class="section-head">
+          <h2>APC UPS</h2>
+          <p class="section-sub" id="ups-source">Source: --</p>
+        </div>
+        <div class="ups-grid">
+          <p>Status <strong id="ups-status">--</strong></p>
+          <p>Battery <strong id="ups-battery">--</strong></p>
+          <p>Load <strong id="ups-load">--</strong></p>
+          <p>Line Voltage <strong id="ups-linev">--</strong></p>
+          <p>Runtime Left <strong id="ups-runtime">--</strong></p>
+          <p>Last Transfer <strong id="ups-lastxfer">--</strong></p>
+        </div>
+      </section>
+
+      <p id="warning" class="warning" aria-live="polite"></p>
+    </main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

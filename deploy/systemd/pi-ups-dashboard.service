@@ -1,0 +1,17 @@
+[Unit]
+Description=Pi UPS Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/pi-ups-dashboard
+ExecStart=/opt/pi-ups-dashboard/pi-ups-dashboard
+Restart=always
+RestartSec=5
+Environment=RUST_LOG=info
+
+[Install]
+WantedBy=multi-user.target
