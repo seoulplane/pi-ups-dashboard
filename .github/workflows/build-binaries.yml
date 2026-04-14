@@ -1,0 +1,41 @@
+name: Build Pi Binaries
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  cross-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross
+        uses: taiki-e/install-action@cross
+
+      - name: Build aarch64 musl
+        run: cross build --release --target aarch64-unknown-linux-musl
+
+      - name: Build armv7 musl
+        run: cross build --release --target armv7-unknown-linux-musleabihf
+
+      - name: Collect binaries
+        run: |
+          mkdir -p binaries
+          cp target/aarch64-unknown-linux-musl/release/pi-ups-dashboard binaries/pi-ups-dashboard-linux-aarch64-musl
+          cp target/armv7-unknown-linux-musleabihf/release/pi-ups-dashboard binaries/pi-ups-dashboard-linux-armv7-musleabihf
+
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-ups-dashboard-binaries
+          path: |
+            binaries/pi-ups-dashboard-linux-aarch64-musl
+            binaries/pi-ups-dashboard-linux-armv7-musleabihf

@@ -1,0 +1,47 @@
+name: Release Deployment Bundle
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross
+        uses: taiki-e/install-action@cross
+
+      - name: Build deployment binaries
+        run: |
+          cross build --release --target aarch64-unknown-linux-musl
+          cross build --release --target armv7-unknown-linux-musleabihf
+
+      - name: Build deployment bundle
+        run: |
+          mkdir -p dist
+          cp target/aarch64-unknown-linux-musl/release/pi-ups-dashboard dist/pi-ups-dashboard-linux-aarch64-musl
+          cp target/armv7-unknown-linux-musleabihf/release/pi-ups-dashboard dist/pi-ups-dashboard-linux-armv7-musleabihf
+          tar -czf dist/static.tar.gz static
+          tar -czf dist/deploy.tar.gz deploy
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/pi-ups-dashboard-linux-aarch64-musl
+            dist/pi-ups-dashboard-linux-armv7-musleabihf
+            dist/static.tar.gz
+            dist/deploy.tar.gz
+          generate_release_notes: true

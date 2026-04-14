@@ -32,6 +32,51 @@ cp target/aarch64-unknown-linux-musl/release/pi-ups-dashboard binaries/pi-ups-da
 cp target/armv7-unknown-linux-musleabihf/release/pi-ups-dashboard binaries/pi-ups-dashboard-linux-armv7-musleabihf
 ```
 
+## GitHub Actions
+
+This repo includes three workflows:
+
+- `.github/workflows/ci.yml`: runs tests and release compile on PRs and pushes to `main`
+- `.github/workflows/build-binaries.yml`: cross-compiles Pi binaries on push to `main` (and manual runs) and uploads them as workflow artifacts
+- `.github/workflows/release-bundle.yml`: on version tags (`v*`) creates a GitHub Release with deploy assets (`binary + static + deploy`)
+
+Recommended deploy flow for a Pi on a private network is pull-based:
+
+1. Pi checks for updates (cron/systemd timer)
+2. Pi runs `git pull --ff-only`
+3. Pi runs one of the deploy scripts in `deploy/systemd/`
+
+This is safer than giving GitHub Actions direct SSH access into your Pi and works well behind NAT/firewalls.
+
+Better than pulling source on every update: pull release assets.
+
+- Build and publish artifacts in GitHub Actions (`release-bundle.yml`)
+- Pi checks latest GitHub Release and downloads only deployment assets
+- Pi deploys binary/static/deploy assets, restarts service, and runs a health check
+- On failure, Pi rolls back to the previous deployed version
+
+Updater files:
+
+- `deploy/systemd/update-from-release.sh`
+- `deploy/systemd/pi-ups-dashboard-update.service`
+- `deploy/systemd/pi-ups-dashboard-update.timer`
+- `deploy/systemd/install-update-timer.sh`
+
+Install the updater timer on Pi:
+
+```bash
+cd /opt/repos/pi-ups-dashboard
+chmod +x deploy/systemd/update-from-release.sh deploy/systemd/install-update-timer.sh
+./deploy/systemd/install-update-timer.sh
+```
+
+Run an immediate update check:
+
+```bash
+sudo systemctl start pi-ups-dashboard-update.service
+sudo systemctl status pi-ups-dashboard-update.service --no-pager
+```
+
 ## Notes
 
 - Frontend auto-refreshes every 30 seconds.

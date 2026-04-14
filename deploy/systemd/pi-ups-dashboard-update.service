@@ -1,0 +1,12 @@
+[Unit]
+Description=Pi UPS Dashboard release updater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/repos/pi-ups-dashboard
+ExecStart=/opt/repos/pi-ups-dashboard/deploy/systemd/update-from-release.sh
+
+[Install]
+WantedBy=multi-user.target
