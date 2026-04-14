@@ -61,6 +61,12 @@ Integration-style tests also validate:
 
 This script will clone or pull the repo, build, deploy to `/opt/pi-ups-dashboard`, and enable/start the service.
 
+By default it runs the service as the current shell user (or `SUDO_USER`). Override explicitly if needed:
+
+```bash
+SERVICE_USER=whoami SERVICE_GROUP=whoami ./deploy/systemd/install-or-update.sh
+```
+
 ```bash
 chmod +x deploy/systemd/install-or-update.sh
 ./deploy/systemd/install-or-update.sh
@@ -75,6 +81,12 @@ Optional: deploy a branch other than `main`:
 ### Option 2: deploy precompiled binary (no Cargo needed on Pi)
 
 This script deploys a binary from `binaries/`, copies static/deploy files, and enables/starts the service.
+
+By default it runs the service as the current shell user (or `SUDO_USER`). Override explicitly if needed:
+
+```bash
+SERVICE_USER=whoami SERVICE_GROUP=whoami ./deploy/systemd/deploy-precompiled.sh
+```
 
 ```bash
 chmod +x deploy/systemd/deploy-precompiled.sh
