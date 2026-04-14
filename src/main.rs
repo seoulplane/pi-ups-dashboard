@@ -41,8 +41,14 @@ struct DashboardResponse {
 #[derive(Serialize)]
 struct SystemStats {
     cpu_percent: u8,
+    cpu_used_percent: f32,
+    cpu_total_percent: f32,
     ram_percent: u8,
+    ram_used_bytes: u64,
+    ram_total_bytes: u64,
     storage_percent: u8,
+    storage_used_bytes: u64,
+    storage_total_bytes: u64,
     temperature_c: f32,
 }
 
@@ -100,10 +106,13 @@ async fn get_dashboard(State(state): State<AppState>) -> impl IntoResponse {
     let mut system = System::new_all();
     system.refresh_all();
 
-    let cpu_percent = system.global_cpu_info().cpu_usage().round().clamp(0.0, 100.0) as u8;
+    let cpu_usage = system.global_cpu_info().cpu_usage().clamp(0.0, 100.0);
+    let cpu_percent = cpu_usage.round() as u8;
 
-    let total_memory = system.total_memory() as f64;
-    let used_memory = system.used_memory() as f64;
+    let total_memory_bytes = (system.total_memory() as u64).saturating_mul(1024);
+    let used_memory_bytes = (system.used_memory() as u64).saturating_mul(1024);
+    let total_memory = total_memory_bytes as f64;
+    let used_memory = used_memory_bytes as f64;
     let ram_percent = if total_memory > 0.0 {
         ((used_memory / total_memory) * 100.0).round().clamp(0.0, 100.0) as u8
     } else {
@@ -111,11 +120,17 @@ async fn get_dashboard(State(state): State<AppState>) -> impl IntoResponse {
     };
 
     let mut storage_percent = 0_u8;
+    let mut storage_used_bytes = 0_u64;
+    let mut storage_total_bytes = 0_u64;
     let disks = Disks::new_with_refreshed_list();
     for disk in disks.list() {
         if disk.mount_point().to_string_lossy() == "/" {
-            let total = disk.total_space() as f64;
-            let avail = disk.available_space() as f64;
+            storage_total_bytes = disk.total_space();
+            let avail_bytes = disk.available_space();
+            storage_used_bytes = storage_total_bytes.saturating_sub(avail_bytes);
+
+            let total = storage_total_bytes as f64;
+            let avail = avail_bytes as f64;
             if total > 0.0 {
                 storage_percent = (((total - avail) / total) * 100.0)
                     .round()
@@ -147,8 +162,14 @@ async fn get_dashboard(State(state): State<AppState>) -> impl IntoResponse {
         status,
         system: SystemStats {
             cpu_percent,
+            cpu_used_percent: cpu_usage,
+            cpu_total_percent: 100.0,
             ram_percent,
+            ram_used_bytes: used_memory_bytes,
+            ram_total_bytes: total_memory_bytes,
             storage_percent,
+            storage_used_bytes,
+            storage_total_bytes,
             temperature_c,
         },
         network: NetworkStats {
@@ -394,8 +415,14 @@ mod tests {
         let ups = parsed.get("ups").expect("ups object");
 
         assert!(system.get("cpu_percent").is_some());
+        assert!(system.get("cpu_used_percent").is_some());
+        assert!(system.get("cpu_total_percent").is_some());
         assert!(system.get("ram_percent").is_some());
+        assert!(system.get("ram_used_bytes").is_some());
+        assert!(system.get("ram_total_bytes").is_some());
         assert!(system.get("storage_percent").is_some());
+        assert!(system.get("storage_used_bytes").is_some());
+        assert!(system.get("storage_total_bytes").is_some());
         assert!(system.get("temperature_c").is_some());
 
         assert!(network.get("download_bytes_per_sec").is_some());
@@ -433,6 +460,6 @@ mod tests {
         let html = String::from_utf8(body.to_vec()).expect("response should be utf-8 HTML");
 
         assert!(html.contains("Pi UPS Dashboard"));
-        assert!(html.contains("Power and System Telemetry"));
+        assert!(html.contains("PI UPS Dashboard"));
     }
 }

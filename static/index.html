@@ -18,7 +18,7 @@
       <header class="top-bar card">
         <div class="title-wrap">
           <p class="eyebrow">Raspberry Pi Zero 2W</p>
-          <h1>Power and System Telemetry</h1>
+          <h1>PI UPS Dashboard</h1>
         </div>
         <div class="status-wrap">
           <span id="global-status" class="status-badge healthy">Healthy</span>
@@ -31,18 +31,21 @@
         <article class="metric-card card">
           <h2>CPU Usage</h2>
           <p class="metric"><span id="cpu">--</span><span class="unit">%</span></p>
+          <p id="cpu-detail" class="metric-detail">-- / --</p>
         </article>
         <article class="metric-card card">
           <h2>RAM Usage</h2>
           <p class="metric"><span id="ram">--</span><span class="unit">%</span></p>
+          <p id="ram-detail" class="metric-detail">-- / --</p>
         </article>
         <article class="metric-card card">
           <h2>Storage Usage</h2>
           <p class="metric"><span id="storage">--</span><span class="unit">%</span></p>
+          <p id="storage-detail" class="metric-detail">-- / --</p>
         </article>
         <article class="metric-card card">
           <h2>Temperature</h2>
-          <p class="metric"><span id="temp">--</span><span class="unit"> C</span></p>
+          <p class="metric"><span id="temp">--</span><span class="unit"> C</span><span id="temp-f" class="unit">(-- F)</span></p>
           <svg
             id="temp-trend"
             class="mini-trend"
@@ -65,7 +68,7 @@
         <svg
           id="network-trend"
           class="network-trend"
-          viewBox="0 0 900 220"
+          viewBox="0 0 900 110"
           role="img"
           aria-label="Network upload and download history trend"
         ></svg>
