@@ -34,11 +34,14 @@ cp target/armv7-unknown-linux-musleabihf/release/pi-ups-dashboard binaries/pi-up
 
 ## GitHub Actions
 
-This repo includes three workflows:
+This repo includes these workflows:
 
 - `.github/workflows/ci.yml`: runs tests and release compile on PRs and pushes to `main`
 - `.github/workflows/build-binaries.yml`: cross-compiles Pi binaries on push to `main` (and manual runs) and uploads them as workflow artifacts
 - `.github/workflows/release-bundle.yml`: on version tags (`v*`) creates a GitHub Release with deploy assets (`binary + static + deploy`)
+- `.github/workflows/security-codeql.yml`: runs GitHub CodeQL scanning for Rust on pushes, PRs, and weekly schedule
+- `.github/workflows/security-rust-audit.yml`: runs Rust dependency advisory checks with `cargo-audit`
+- `.github/workflows/security-secrets.yml`: scans commits/PRs for leaked secrets using Gitleaks
 
 Recommended deploy flow for a Pi on a private network is pull-based:
 
