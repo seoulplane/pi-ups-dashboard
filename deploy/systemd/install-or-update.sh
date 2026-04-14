@@ -42,15 +42,24 @@ cargo build --release --manifest-path "$REPO_DIR/Cargo.toml"
 
 BIN_SRC="$REPO_DIR/target/release/pi-ups-dashboard"
 BIN_DST="$DEPLOY_DIR/pi-ups-dashboard"
+STATIC_SRC="$REPO_DIR/static"
+STATIC_DST="$DEPLOY_DIR/static"
 
 if [[ ! -f "$BIN_SRC" ]]; then
   echo "Build did not produce $BIN_SRC"
   exit 1
 fi
 
+if [[ ! -d "$STATIC_SRC" ]]; then
+  echo "Expected static assets at $STATIC_SRC"
+  exit 1
+fi
+
 echo "Deploying to $DEPLOY_DIR"
 sudo mkdir -p "$DEPLOY_DIR"
 sudo install -m 0755 "$BIN_SRC" "$BIN_DST"
+sudo rm -rf "$STATIC_DST"
+sudo cp -R "$STATIC_SRC" "$STATIC_DST"
 sudo rm -rf "$DEPLOY_DIR/deploy"
 sudo cp -R "$REPO_DIR/deploy" "$DEPLOY_DIR/"
 

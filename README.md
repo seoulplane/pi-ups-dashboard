@@ -92,6 +92,7 @@ chmod +x deploy/systemd/install-service.sh
 
 The installer copies:
 - binary: `/opt/repos/pi-ups-dashboard/target/release/pi-ups-dashboard` -> `/opt/pi-ups-dashboard/pi-ups-dashboard`
+- static assets: `/opt/repos/pi-ups-dashboard/static` -> `/opt/pi-ups-dashboard/static`
 - service files: `/opt/repos/pi-ups-dashboard/deploy` -> `/opt/pi-ups-dashboard/deploy`
 
 Service unit file: `deploy/systemd/pi-ups-dashboard.service`
