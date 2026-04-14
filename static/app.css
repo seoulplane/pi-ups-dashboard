@@ -9,7 +9,7 @@
   --warn: #ffd43b;
   --crit: #ff4d6d;
   --border: #2a3352;
-  --shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  --shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -21,9 +21,9 @@ body {
   font-family: "Space Grotesk", sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at 18% 18%, rgba(0, 247, 255, 0.14) 0%, transparent 38%),
-    radial-gradient(circle at 82% 0%, rgba(255, 46, 166, 0.16) 0%, transparent 42%),
-    linear-gradient(160deg, #070910 0%, #0a0f1d 42%, #090b14 100%);
+    radial-gradient(circle at 18% 18%, rgba(0, 247, 255, 0.2) 0%, transparent 38%),
+    radial-gradient(circle at 82% 0%, rgba(255, 46, 166, 0.22) 0%, transparent 42%),
+    linear-gradient(160deg, #05060d 0%, #070b16 42%, #090b14 100%);
   min-height: 100vh;
 }
 
@@ -50,6 +50,17 @@ body {
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: var(--shadow);
+  backdrop-filter: blur(2px);
+  position: relative;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 247, 255, 0.08);
 }
 
 .top-bar {

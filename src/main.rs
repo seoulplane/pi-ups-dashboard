@@ -41,6 +41,7 @@ struct DashboardResponse {
 #[derive(Serialize)]
 struct SystemStats {
     cpu_percent: u8,
+    cpu_active_cores: u16,
     cpu_used_cores: f32,
     cpu_total_cores: u16,
     cpu_used_percent: f32,
@@ -110,6 +111,11 @@ async fn get_dashboard(State(state): State<AppState>) -> impl IntoResponse {
 
     let cpu_total_cores = system.cpus().len().max(1) as u16;
     let cpu_usage = system.global_cpu_info().cpu_usage().clamp(0.0, 100.0);
+    let cpu_active_cores = system
+        .cpus()
+        .iter()
+        .filter(|cpu| cpu.cpu_usage() >= 1.0)
+        .count() as u16;
     let cpu_used_cores = (cpu_total_cores as f32) * (cpu_usage / 100.0);
     let cpu_percent = cpu_usage.round() as u8;
 
@@ -166,6 +172,7 @@ async fn get_dashboard(State(state): State<AppState>) -> impl IntoResponse {
         status,
         system: SystemStats {
             cpu_percent,
+            cpu_active_cores,
             cpu_used_cores,
             cpu_total_cores,
             cpu_used_percent: cpu_usage,
@@ -421,6 +428,7 @@ mod tests {
         let ups = parsed.get("ups").expect("ups object");
 
         assert!(system.get("cpu_percent").is_some());
+        assert!(system.get("cpu_active_cores").is_some());
         assert!(system.get("cpu_used_cores").is_some());
         assert!(system.get("cpu_total_cores").is_some());
         assert!(system.get("cpu_used_percent").is_some());
@@ -448,6 +456,10 @@ mod tests {
             .get("cpu_total_cores")
             .and_then(Value::as_u64)
             .expect("cpu_total_cores should be numeric");
+        let cpu_active_cores = system
+            .get("cpu_active_cores")
+            .and_then(Value::as_u64)
+            .expect("cpu_active_cores should be numeric");
         let cpu_used_cores = system
             .get("cpu_used_cores")
             .and_then(Value::as_f64)
@@ -470,6 +482,7 @@ mod tests {
             .expect("storage_used_bytes should be numeric");
 
         assert!(cpu_total_cores >= 1);
+        assert!(cpu_active_cores <= cpu_total_cores);
         assert!(cpu_used_cores >= 0.0);
         assert!(cpu_used_cores <= cpu_total_cores as f64 + 0.01);
         assert!(ram_total_bytes >= ram_used_bytes);

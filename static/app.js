@@ -158,12 +158,12 @@ function render(data) {
   applyStatus(data.status || "Healthy");
   ids.lastUpdated.textContent = `Last update: ${new Date(data.updated_at).toLocaleTimeString()}`;
 
-  ids.cpu.textContent = data.system.cpu_used_cores.toFixed(1);
-  ids.cpuDetail.textContent = `${data.system.cpu_used_cores.toFixed(1)} cores out of ${data.system.cpu_total_cores} cores`;
+  ids.cpu.textContent = data.system.cpu_percent;
+  ids.cpuDetail.textContent = `${data.system.cpu_active_cores} Cores/${data.system.cpu_total_cores} Cores`;
   ids.ram.textContent = data.system.ram_percent;
-  ids.ramDetail.textContent = `${formatGb(data.system.ram_used_bytes)} / ${formatGb(data.system.ram_total_bytes)}`;
+  ids.ramDetail.textContent = `${formatGb(data.system.ram_used_bytes)}/${formatGb(data.system.ram_total_bytes)}`;
   ids.storage.textContent = data.system.storage_percent;
-  ids.storageDetail.textContent = `${formatGb(data.system.storage_used_bytes)} / ${formatGb(data.system.storage_total_bytes)}`;
+  ids.storageDetail.textContent = `${formatGb(data.system.storage_used_bytes)}/${formatGb(data.system.storage_total_bytes)}`;
   ids.temp.textContent = data.system.temperature_c.toFixed(1);
   ids.tempF.textContent = `(${((data.system.temperature_c * 9) / 5 + 32).toFixed(1)} F)`;
 
