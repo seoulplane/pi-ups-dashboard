@@ -13,5 +13,21 @@ Restart=always
 RestartSec=5
 Environment=RUST_LOG=info
 
+MemoryMax=64M
+MemoryHigh=48M
+TasksMax=64
+LimitNOFILE=1024
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+
 [Install]
 WantedBy=multi-user.target

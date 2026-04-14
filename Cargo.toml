@@ -4,11 +4,19 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+async-stream = "0.3"
 axum = "0.7"
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sysinfo = "0.30"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros", "net", "time", "sync", "process", "fs", "io-util", "signal"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
 tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.5", features = ["fs"] }
+tower-http = { version = "0.5", features = ["fs", "compression-br", "compression-gzip", "set-header"] }
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+strip = "symbols"

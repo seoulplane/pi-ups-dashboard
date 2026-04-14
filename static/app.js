@@ -24,9 +24,9 @@ const ids = {
   upsLastxfer: document.getElementById("ups-lastxfer"),
 };
 
-let secondsRemaining = 30;
 let lastSuccess = null;
 const MAX_HISTORY = 20;
+const STALE_AFTER_MS = 15_000;
 
 const history = {
   temperature: [],
@@ -191,35 +191,54 @@ function render(data) {
   drawDualTrend(ids.networkTrend, history.download, history.upload);
 }
 
-async function loadDashboard() {
+function handleSnapshot(data) {
+  render(data);
+  lastSuccess = Date.now();
+  ids.warning.textContent = "";
+}
+
+async function fetchSnapshotFallback() {
   try {
     const response = await fetch("/api/dashboard", { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
-
-    const data = await response.json();
-    render(data);
-    lastSuccess = Date.now();
-    ids.warning.textContent = "";
-    secondsRemaining = 30;
-  } catch (error) {
-    const now = Date.now();
-    if (lastSuccess && now - lastSuccess > 90_000) {
-      applyStatus("Stale");
-      ids.warning.textContent = "Data is stale. Waiting for successful refresh.";
-    } else {
-      ids.warning.textContent = "Refresh failed. Retrying at next interval.";
-    }
+    handleSnapshot(await response.json());
+  } catch (_) {
+    ids.warning.textContent = "Refresh failed. Retrying.";
   }
 }
 
+function connectStream() {
+  const source = new EventSource("/api/dashboard/stream");
+
+  source.onmessage = (event) => {
+    try {
+      handleSnapshot(JSON.parse(event.data));
+    } catch (_) {
+      // ignore malformed frame; next frame will recover
+    }
+  };
+
+  source.onerror = () => {
+    ids.warning.textContent = "Live stream interrupted. Reconnecting.";
+    // EventSource reconnects automatically; nothing else to do.
+  };
+}
+
 setInterval(() => {
-  secondsRemaining -= 1;
-  if (secondsRemaining <= 0) {
-    loadDashboard();
+  const now = Date.now();
+  if (!lastSuccess) {
+    ids.refreshIn.textContent = "Connecting...";
+    return;
   }
-  ids.refreshIn.textContent = `Next refresh: ${Math.max(0, secondsRemaining)}s`;
+  const age = Math.max(0, Math.round((now - lastSuccess) / 1000));
+  ids.refreshIn.textContent = `Updated ${age}s ago`;
+  if (now - lastSuccess > STALE_AFTER_MS) {
+    applyStatus("Stale");
+    ids.warning.textContent = "Data is stale. Waiting for next sample.";
+  }
 }, 1000);
 
-loadDashboard();
+fetchSnapshotFallback();
+connectStream();

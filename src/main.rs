@@ -1,9 +1,11 @@
 use std::fs;
-use std::process::Command;
+use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use axum::extract::State;
+use axum::http::{header, HeaderValue};
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Json;
@@ -13,22 +15,29 @@ use serde::Serialize;
 use sysinfo::Disks;
 use sysinfo::Networks;
 use sysinfo::System;
-use tokio::sync::Mutex;
+use sysinfo::MINIMUM_CPU_UPDATE_INTERVAL;
+use tokio::process::Command;
+use tokio::sync::{broadcast, RwLock};
+use tokio::time;
+use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::StreamExt;
+use tower::ServiceBuilder;
+use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
+use tower_http::set_header::SetResponseHeaderLayer;
+
+const SAMPLE_INTERVAL: Duration = Duration::from_secs(2);
+const APCACCESS_TIMEOUT: Duration = Duration::from_secs(3);
+const BROADCAST_CAPACITY: usize = 16;
+const STALE_AFTER: Duration = Duration::from_secs(15);
 
 #[derive(Clone)]
 struct AppState {
-    telemetry: Arc<Mutex<TelemetryState>>,
+    snapshot: Arc<RwLock<DashboardResponse>>,
+    tx: broadcast::Sender<DashboardResponse>,
 }
 
-struct TelemetryState {
-    previous_rx: u64,
-    previous_tx: u64,
-    previous_sample: Instant,
-    initialized: bool,
-}
-
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct DashboardResponse {
     updated_at: String,
     stale: bool,
@@ -38,7 +47,7 @@ struct DashboardResponse {
     ups: UpsStats,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct SystemStats {
     cpu_percent: u8,
     cpu_active_cores: u16,
@@ -55,13 +64,13 @@ struct SystemStats {
     temperature_c: f32,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct NetworkStats {
     download_bytes_per_sec: f64,
     upload_bytes_per_sec: f64,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct UpsStats {
     status: String,
     battery_percent: f32,
@@ -72,161 +81,228 @@ struct UpsStats {
     source: String,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
+    let (tx, _rx) = broadcast::channel(BROADCAST_CAPACITY);
+    let snapshot = Arc::new(RwLock::new(empty_snapshot()));
+
+    tokio::spawn(sampler_task(snapshot.clone(), tx.clone()));
+
     let state = AppState {
-        telemetry: Arc::new(Mutex::new(TelemetryState {
-            previous_rx: 0,
-            previous_tx: 0,
-            previous_sample: Instant::now(),
-            initialized: false,
-        })),
+        snapshot,
+        tx,
     };
 
-    let app = build_app(state);
+    let static_dir = resolve_static_dir();
+    let app = build_app(state, static_dir.clone());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080")
         .await
         .expect("failed to bind server");
 
-    println!("Dashboard running at http://127.0.0.1:8080");
+    println!(
+        "Dashboard running at http://127.0.0.1:8080 (static: {})",
+        static_dir.display()
+    );
 
-    axum::serve(listener, app)
-        .await
-        .expect("server failed");
+    axum::serve(listener, app).await.expect("server failed");
 }
 
-fn build_app(state: AppState) -> Router {
-    let api = Router::new().route("/dashboard", get(get_dashboard));
+fn resolve_static_dir() -> PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let candidate = dir.join("static");
+            if candidate.is_dir() {
+                return candidate;
+            }
+        }
+    }
+    PathBuf::from("static")
+}
+
+fn build_app(state: AppState, static_dir: PathBuf) -> Router {
+    let api = Router::new()
+        .route("/dashboard", get(get_dashboard))
+        .route("/dashboard/stream", get(get_dashboard_stream));
+
+    let static_service = ServiceBuilder::new()
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=300"),
+        ))
+        .service(ServeDir::new(static_dir));
 
     Router::new()
         .nest("/api", api)
-        .fallback_service(ServeDir::new("static"))
+        .fallback_service(static_service)
+        .layer(CompressionLayer::new())
         .with_state(state)
 }
 
 async fn get_dashboard(State(state): State<AppState>) -> impl IntoResponse {
-    let mut system = System::new_all();
-    system.refresh_all();
-
-    let cpu_total_cores = system.cpus().len().max(1) as u16;
-    let cpu_usage = system.global_cpu_info().cpu_usage().clamp(0.0, 100.0);
-    let cpu_active_cores = system
-        .cpus()
-        .iter()
-        .filter(|cpu| cpu.cpu_usage() >= 1.0)
-        .count() as u16;
-    let cpu_used_cores = (cpu_total_cores as f32) * (cpu_usage / 100.0);
-    let cpu_percent = cpu_usage.round() as u8;
-
-    let total_memory_bytes = (system.total_memory() as u64).saturating_mul(1024);
-    let used_memory_bytes = (system.used_memory() as u64).saturating_mul(1024);
-    let total_memory = total_memory_bytes as f64;
-    let used_memory = used_memory_bytes as f64;
-    let ram_percent = if total_memory > 0.0 {
-        ((used_memory / total_memory) * 100.0).round().clamp(0.0, 100.0) as u8
-    } else {
-        0
-    };
-
-    let mut storage_percent = 0_u8;
-    let mut storage_used_bytes = 0_u64;
-    let mut storage_total_bytes = 0_u64;
-    let disks = Disks::new_with_refreshed_list();
-    for disk in disks.list() {
-        if disk.mount_point().to_string_lossy() == "/" {
-            storage_total_bytes = disk.total_space();
-            let avail_bytes = disk.available_space();
-            storage_used_bytes = storage_total_bytes.saturating_sub(avail_bytes);
-
-            let total = storage_total_bytes as f64;
-            let avail = avail_bytes as f64;
-            if total > 0.0 {
-                storage_percent = (((total - avail) / total) * 100.0)
-                    .round()
-                    .clamp(0.0, 100.0) as u8;
-            }
-            break;
-        }
-    }
-
-    let temperature_c = read_pi_temperature_c().unwrap_or(0.0);
-
-    let (download_bps, upload_bps) = compute_network_rates(&state).await;
-
-    let ups = collect_ups_stats().unwrap_or_else(|| UpsStats {
-        status: "UNKNOWN".to_string(),
-        battery_percent: 0.0,
-        load_percent: 0.0,
-        line_voltage: 0.0,
-        runtime_minutes: 0,
-        last_transfer: "Unavailable".to_string(),
-        source: "fallback".to_string(),
-    });
-
-    let status = derive_global_status(temperature_c, &ups.status, &ups.battery_percent);
-
-    let payload = DashboardResponse {
-        updated_at: Utc::now().to_rfc3339(),
-        stale: false,
-        status,
-        system: SystemStats {
-            cpu_percent,
-            cpu_active_cores,
-            cpu_used_cores,
-            cpu_total_cores,
-            cpu_used_percent: cpu_usage,
-            cpu_total_percent: 100.0,
-            ram_percent,
-            ram_used_bytes: used_memory_bytes,
-            ram_total_bytes: total_memory_bytes,
-            storage_percent,
-            storage_used_bytes,
-            storage_total_bytes,
-            temperature_c,
-        },
-        network: NetworkStats {
-            download_bytes_per_sec: download_bps,
-            upload_bytes_per_sec: upload_bps,
-        },
-        ups,
-    };
-
-    Json(payload)
+    let snap = state.snapshot.read().await.clone();
+    Json(snap)
 }
 
-async fn compute_network_rates(state: &AppState) -> (f64, f64) {
+async fn get_dashboard_stream(State(state): State<AppState>) -> impl IntoResponse {
+    let initial = state.snapshot.read().await.clone();
+    let rx = state.tx.subscribe();
+
+    let stream = async_stream::stream! {
+        yield Ok::<_, std::convert::Infallible>(
+            Event::default()
+                .json_data(&initial)
+                .unwrap_or_else(|_| Event::default()),
+        );
+
+        let mut tail = BroadcastStream::new(rx);
+        while let Some(Ok(snap)) = tail.next().await {
+            yield Ok(
+                Event::default()
+                    .json_data(&snap)
+                    .unwrap_or_else(|_| Event::default()),
+            );
+        }
+    };
+
+    Sse::new(stream).keep_alive(KeepAlive::default())
+}
+
+async fn sampler_task(
+    snapshot: Arc<RwLock<DashboardResponse>>,
+    tx: broadcast::Sender<DashboardResponse>,
+) {
+    let mut system = System::new_all();
+    let mut disks = Disks::new_with_refreshed_list();
     let mut networks = Networks::new_with_refreshed_list();
-    networks.refresh();
 
-    let mut total_rx = 0_u64;
-    let mut total_tx = 0_u64;
+    system.refresh_cpu();
+    time::sleep(MINIMUM_CPU_UPDATE_INTERVAL).await;
 
-    for (_, data) in &networks {
-        total_rx += data.total_received();
-        total_tx += data.total_transmitted();
+    let mut prev_rx: u64 = 0;
+    let mut prev_tx: u64 = 0;
+    let mut prev_sample = Instant::now();
+    let mut initialized = false;
+
+    loop {
+        system.refresh_cpu();
+        system.refresh_memory();
+        disks.refresh();
+        networks.refresh();
+
+        let cpu_total_cores = system.cpus().len().max(1) as u16;
+        let cpu_usage = system.global_cpu_info().cpu_usage().clamp(0.0, 100.0);
+        let cpu_active_cores = system
+            .cpus()
+            .iter()
+            .filter(|cpu| cpu.cpu_usage() >= 1.0)
+            .count() as u16;
+        let cpu_used_cores = (cpu_total_cores as f32) * (cpu_usage / 100.0);
+        let cpu_percent = cpu_usage.round() as u8;
+
+        let total_memory_bytes = (system.total_memory() as u64).saturating_mul(1024);
+        let used_memory_bytes = (system.used_memory() as u64).saturating_mul(1024);
+        let ram_percent = if total_memory_bytes > 0 {
+            ((used_memory_bytes as f64 / total_memory_bytes as f64) * 100.0)
+                .round()
+                .clamp(0.0, 100.0) as u8
+        } else {
+            0
+        };
+
+        let (storage_percent, storage_used_bytes, storage_total_bytes) = read_root_disk(&disks);
+        let temperature_c = read_pi_temperature_c().unwrap_or(0.0);
+
+        let mut total_rx = 0_u64;
+        let mut total_tx = 0_u64;
+        for (name, data) in &networks {
+            if is_virtual_interface(name) {
+                continue;
+            }
+            total_rx += data.total_received();
+            total_tx += data.total_transmitted();
+        }
+
+        let now = Instant::now();
+        let (download_bps, upload_bps) = if initialized {
+            let elapsed = now.duration_since(prev_sample).as_secs_f64().max(0.001);
+            (
+                total_rx.saturating_sub(prev_rx) as f64 / elapsed,
+                total_tx.saturating_sub(prev_tx) as f64 / elapsed,
+            )
+        } else {
+            (0.0, 0.0)
+        };
+        prev_rx = total_rx;
+        prev_tx = total_tx;
+        prev_sample = now;
+        initialized = true;
+
+        let ups = collect_ups_stats().await.unwrap_or_else(fallback_ups);
+        let status = derive_global_status(temperature_c, &ups.status, &ups.battery_percent);
+
+        let payload = DashboardResponse {
+            updated_at: Utc::now().to_rfc3339(),
+            stale: false,
+            status,
+            system: SystemStats {
+                cpu_percent,
+                cpu_active_cores,
+                cpu_used_cores,
+                cpu_total_cores,
+                cpu_used_percent: cpu_usage,
+                cpu_total_percent: 100.0,
+                ram_percent,
+                ram_used_bytes: used_memory_bytes,
+                ram_total_bytes: total_memory_bytes,
+                storage_percent,
+                storage_used_bytes,
+                storage_total_bytes,
+                temperature_c,
+            },
+            network: NetworkStats {
+                download_bytes_per_sec: download_bps,
+                upload_bytes_per_sec: upload_bps,
+            },
+            ups,
+        };
+
+        {
+            let mut guard = snapshot.write().await;
+            *guard = payload.clone();
+        }
+        let _ = tx.send(payload);
+
+        time::sleep(SAMPLE_INTERVAL).await;
     }
+}
 
-    let mut lock = state.telemetry.lock().await;
-    let now = Instant::now();
+fn is_virtual_interface(name: &str) -> bool {
+    name == "lo"
+        || name.starts_with("docker")
+        || name.starts_with("br-")
+        || name.starts_with("veth")
+        || name.starts_with("tailscale")
+        || name.starts_with("wg")
+}
 
-    if !lock.initialized {
-        lock.previous_rx = total_rx;
-        lock.previous_tx = total_tx;
-        lock.previous_sample = now;
-        lock.initialized = true;
-        return (0.0, 0.0);
+fn read_root_disk(disks: &Disks) -> (u8, u64, u64) {
+    for disk in disks.list() {
+        if disk.mount_point().to_string_lossy() == "/" {
+            let total = disk.total_space();
+            let avail = disk.available_space();
+            let used = total.saturating_sub(avail);
+            let pct = if total > 0 {
+                ((used as f64 / total as f64) * 100.0)
+                    .round()
+                    .clamp(0.0, 100.0) as u8
+            } else {
+                0
+            };
+            return (pct, used, total);
+        }
     }
-
-    let elapsed = now.duration_since(lock.previous_sample).as_secs_f64().max(1.0);
-    let rx_delta = total_rx.saturating_sub(lock.previous_rx) as f64;
-    let tx_delta = total_tx.saturating_sub(lock.previous_tx) as f64;
-
-    lock.previous_rx = total_rx;
-    lock.previous_tx = total_tx;
-    lock.previous_sample = now;
-
-    (rx_delta / elapsed, tx_delta / elapsed)
+    (0, 0, 0)
 }
 
 fn read_pi_temperature_c() -> Option<f32> {
@@ -235,8 +311,12 @@ fn read_pi_temperature_c() -> Option<f32> {
     Some((milli / 1000.0 * 10.0).round() / 10.0)
 }
 
-fn collect_ups_stats() -> Option<UpsStats> {
-    let output = Command::new("apcaccess").output().ok()?;
+async fn collect_ups_stats() -> Option<UpsStats> {
+    let output = time::timeout(APCACCESS_TIMEOUT, Command::new("apcaccess").output())
+        .await
+        .ok()?
+        .ok()?;
+
     if !output.status.success() {
         return None;
     }
@@ -295,6 +375,57 @@ fn derive_global_status(temp_c: f32, ups_status: &str, battery_percent: &f32) ->
         "Warning".to_string()
     } else {
         "Healthy".to_string()
+    }
+}
+
+fn fallback_ups() -> UpsStats {
+    UpsStats {
+        status: "UNKNOWN".to_string(),
+        battery_percent: 0.0,
+        load_percent: 0.0,
+        line_voltage: 0.0,
+        runtime_minutes: 0,
+        last_transfer: "Unavailable".to_string(),
+        source: "fallback".to_string(),
+    }
+}
+
+fn empty_snapshot() -> DashboardResponse {
+    DashboardResponse {
+        updated_at: Utc::now().to_rfc3339(),
+        stale: true,
+        status: "Healthy".to_string(),
+        system: SystemStats {
+            cpu_percent: 0,
+            cpu_active_cores: 0,
+            cpu_used_cores: 0.0,
+            cpu_total_cores: 1,
+            cpu_used_percent: 0.0,
+            cpu_total_percent: 100.0,
+            ram_percent: 0,
+            ram_used_bytes: 0,
+            ram_total_bytes: 0,
+            storage_percent: 0,
+            storage_used_bytes: 0,
+            storage_total_bytes: 0,
+            temperature_c: 0.0,
+        },
+        network: NetworkStats {
+            download_bytes_per_sec: 0.0,
+            upload_bytes_per_sec: 0.0,
+        },
+        ups: fallback_ups(),
+    }
+}
+
+#[allow(dead_code)]
+fn is_stale(updated_at: &str) -> bool {
+    match chrono::DateTime::parse_from_rfc3339(updated_at) {
+        Ok(ts) => {
+            let elapsed = Utc::now().signed_duration_since(ts.with_timezone(&Utc));
+            elapsed.to_std().map(|d| d > STALE_AFTER).unwrap_or(false)
+        }
+        Err(_) => true,
     }
 }
 
@@ -384,20 +515,27 @@ mod tests {
         assert_eq!(derive_global_status(59.9, "ONLINE", &40.0), "Healthy");
     }
 
+    #[test]
+    fn is_virtual_interface_detects_loopback_and_bridges() {
+        assert!(is_virtual_interface("lo"));
+        assert!(is_virtual_interface("docker0"));
+        assert!(is_virtual_interface("br-abc123"));
+        assert!(is_virtual_interface("veth9f1"));
+        assert!(!is_virtual_interface("eth0"));
+        assert!(!is_virtual_interface("wlan0"));
+    }
+
     fn test_state() -> AppState {
+        let (tx, _) = broadcast::channel(BROADCAST_CAPACITY);
         AppState {
-            telemetry: Arc::new(Mutex::new(TelemetryState {
-                previous_rx: 0,
-                previous_tx: 0,
-                previous_sample: Instant::now(),
-                initialized: false,
-            })),
+            snapshot: Arc::new(RwLock::new(empty_snapshot())),
+            tx,
         }
     }
 
     #[tokio::test]
     async fn integration_api_dashboard_returns_expected_json_shape() {
-        let app = build_app(test_state());
+        let app = build_app(test_state(), PathBuf::from("static"));
 
         let response = app
             .oneshot(
@@ -491,7 +629,7 @@ mod tests {
 
     #[tokio::test]
     async fn integration_static_root_serves_html_page() {
-        let app = build_app(test_state());
+        let app = build_app(test_state(), PathBuf::from("static"));
 
         let response = app
             .oneshot(
