@@ -171,6 +171,72 @@ h1 {
   font-family: "IBM Plex Mono", monospace;
 }
 
+.cpu-layout {
+  display: flex;
+  align-items: stretch;
+  gap: 0.6rem;
+  margin-top: 0.1rem;
+}
+
+.cpu-total {
+  flex: 0 0 auto;
+  min-width: 3.4rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.cpu-cores {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-rows: repeat(4, 1fr);
+  gap: 0.18rem;
+  padding-left: 0.55rem;
+  border-left: 1px dashed var(--border);
+}
+
+.core-row {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr 2.1rem;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+
+.core-label {
+  letter-spacing: 0.04em;
+}
+
+.core-bar {
+  height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.core-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
+  transition: width 0.4s ease;
+}
+
+.core-fill.warning {
+  background: linear-gradient(90deg, var(--warn) 0%, var(--accent-2) 100%);
+}
+
+.core-fill.critical {
+  background: linear-gradient(90deg, var(--crit) 0%, var(--accent-2) 100%);
+}
+
+.core-value {
+  text-align: right;
+  color: var(--text);
+}
+
 .mini-trend {
   margin-top: 0.4rem;
   width: 100%;

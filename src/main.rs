@@ -55,6 +55,7 @@ struct SystemStats {
     cpu_total_cores: u16,
     cpu_used_percent: f32,
     cpu_total_percent: f32,
+    cpu_cores_percent: Vec<u8>,
     ram_percent: u8,
     ram_used_bytes: u64,
     ram_total_bytes: u64,
@@ -192,11 +193,12 @@ async fn sampler_task(
 
         let cpu_total_cores = system.cpus().len().max(1) as u16;
         let cpu_usage = system.global_cpu_info().cpu_usage().clamp(0.0, 100.0);
-        let cpu_active_cores = system
+        let cpu_cores_percent: Vec<u8> = system
             .cpus()
             .iter()
-            .filter(|cpu| cpu.cpu_usage() >= 1.0)
-            .count() as u16;
+            .map(|cpu| cpu.cpu_usage().clamp(0.0, 100.0).round() as u8)
+            .collect();
+        let cpu_active_cores = cpu_cores_percent.iter().filter(|&&p| p >= 1).count() as u16;
         let cpu_used_cores = (cpu_total_cores as f32) * (cpu_usage / 100.0);
         let cpu_percent = cpu_usage.round() as u8;
 
@@ -252,6 +254,7 @@ async fn sampler_task(
                 cpu_total_cores,
                 cpu_used_percent: cpu_usage,
                 cpu_total_percent: 100.0,
+                cpu_cores_percent,
                 ram_percent,
                 ram_used_bytes: used_memory_bytes,
                 ram_total_bytes: total_memory_bytes,
@@ -402,6 +405,7 @@ fn empty_snapshot() -> DashboardResponse {
             cpu_total_cores: 1,
             cpu_used_percent: 0.0,
             cpu_total_percent: 100.0,
+            cpu_cores_percent: Vec::new(),
             ram_percent: 0,
             ram_used_bytes: 0,
             ram_total_bytes: 0,
@@ -571,6 +575,15 @@ mod tests {
         assert!(system.get("cpu_total_cores").is_some());
         assert!(system.get("cpu_used_percent").is_some());
         assert!(system.get("cpu_total_percent").is_some());
+        assert!(system.get("cpu_cores_percent").is_some());
+        let cores = system
+            .get("cpu_cores_percent")
+            .and_then(Value::as_array)
+            .expect("cpu_cores_percent should be an array");
+        for v in cores {
+            let pct = v.as_u64().expect("each core percent is numeric");
+            assert!(pct <= 100);
+        }
         assert!(system.get("ram_percent").is_some());
         assert!(system.get("ram_used_bytes").is_some());
         assert!(system.get("ram_total_bytes").is_some());

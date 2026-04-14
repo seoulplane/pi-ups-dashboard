@@ -5,6 +5,7 @@ const ids = {
   warning: document.getElementById("warning"),
   cpu: document.getElementById("cpu"),
   cpuDetail: document.getElementById("cpu-detail"),
+  cpuCores: document.getElementById("cpu-cores"),
   ram: document.getElementById("ram"),
   ramDetail: document.getElementById("ram-detail"),
   storage: document.getElementById("storage"),
@@ -134,6 +135,32 @@ function formatGb(bytes) {
   return `${gb.toFixed(1)} GB`;
 }
 
+function coreFillClass(value) {
+  if (value >= 90) return "critical";
+  if (value >= 70) return "warning";
+  return "";
+}
+
+function renderCpuCores(percents) {
+  const el = ids.cpuCores;
+  if (!el) return;
+  if (!percents.length) {
+    el.innerHTML = "";
+    return;
+  }
+  el.innerHTML = percents
+    .map((raw, i) => {
+      const pct = Math.max(0, Math.min(100, Math.round(Number(raw) || 0)));
+      const klass = coreFillClass(pct);
+      return `<div class="core-row">
+        <span class="core-label">C${i}</span>
+        <div class="core-bar"><div class="core-fill ${klass}" style="width:${pct}%"></div></div>
+        <span class="core-value">${pct}%</span>
+      </div>`;
+    })
+    .join("");
+}
+
 function setUsageClass(element, value, warningThreshold, criticalThreshold) {
   element.classList.remove("usage-normal", "usage-warning", "usage-critical");
   if (value >= criticalThreshold) {
@@ -165,6 +192,7 @@ function render(data) {
 
   ids.cpu.textContent = data.system.cpu_percent;
   ids.cpuDetail.textContent = `${data.system.cpu_active_cores} Cores/${data.system.cpu_total_cores} Cores`;
+  renderCpuCores(data.system.cpu_cores_percent || []);
   ids.ram.textContent = data.system.ram_percent;
   ids.ramDetail.textContent = `${formatMb(data.system.ram_used_bytes)}/${formatMb(data.system.ram_total_bytes)}`;
   ids.storage.textContent = data.system.storage_percent;
