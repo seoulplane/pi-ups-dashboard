@@ -4,6 +4,7 @@ set -euo pipefail
 GITHUB_REPO="${GITHUB_REPO:-seoulplane/pi-ups-dashboard}"
 PINNED_TAG="${PINNED_TAG:-}"
 RELEASE_TAG_PATTERN="${RELEASE_TAG_PATTERN:-.*}"
+NO_RELEASE_BEHAVIOR="${NO_RELEASE_BEHAVIOR:-skip}"
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/pi-ups-dashboard}"
 BACKUP_ROOT="${BACKUP_ROOT:-/opt/pi-ups-dashboard-backups}"
 STATE_DIR="${STATE_DIR:-/var/lib/pi-ups-dashboard-updater}"
@@ -128,7 +129,25 @@ cleanup() {
 trap cleanup EXIT
 
 release_json="$tmp_dir/release.json"
-curl -fsSL "$api_url" -o "$release_json"
+http_code="$(curl -sS -w "%{http_code}" -o "$release_json" "$api_url")"
+if [[ "$http_code" != "200" ]]; then
+  if [[ "$http_code" == "404" && -z "$PINNED_TAG" ]]; then
+    if [[ "$NO_RELEASE_BEHAVIOR" == "skip" ]]; then
+      echo "No GitHub release found yet for ${GITHUB_REPO}. Skipping update check."
+      exit 0
+    fi
+    echo "No GitHub release found yet for ${GITHUB_REPO} and NO_RELEASE_BEHAVIOR=$NO_RELEASE_BEHAVIOR"
+    exit 1
+  fi
+
+  if [[ "$http_code" == "404" && -n "$PINNED_TAG" ]]; then
+    echo "Pinned tag '$PINNED_TAG' was not found in GitHub Releases for ${GITHUB_REPO}"
+    exit 1
+  fi
+
+  echo "GitHub API request failed with HTTP $http_code for $api_url"
+  exit 1
+fi
 
 latest_tag="$(extract_tag_name "$release_json")"
 if [[ -z "$latest_tag" ]]; then

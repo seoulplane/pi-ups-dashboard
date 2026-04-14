@@ -94,6 +94,14 @@ Useful options in `/etc/default/pi-ups-dashboard-updater`:
 
 - `RELEASE_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'` for stable-only SemVer tags
 - `PINNED_TAG=v1.2.3` to lock to a specific release
+- `NO_RELEASE_BEHAVIOR=skip` (default) to avoid failure before the first release exists
+
+Important: the release updater requires at least one GitHub Release to exist. Create your first release by tagging `main`:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
 
 ## Notes
 
