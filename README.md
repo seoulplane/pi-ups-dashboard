@@ -15,6 +15,23 @@ Open http://127.0.0.1:8080
 
 The server binds to `0.0.0.0:8080`, so anyone on your network can view it via `http://<pi-ip>:8080`.
 
+## Precompiled binaries
+
+Cross-compiled Linux binaries are placed in `binaries/`:
+
+- `binaries/pi-ups-dashboard-linux-aarch64-musl` (for 64-bit Raspberry Pi OS)
+- `binaries/pi-ups-dashboard-linux-armv7-musleabihf` (for 32-bit Raspberry Pi OS)
+
+Build them from macOS (Apple Silicon) with Docker + `cross`:
+
+```bash
+CROSS_CONTAINER_OPTS='--platform=linux/amd64' cross build --release --target aarch64-unknown-linux-musl
+CROSS_CONTAINER_OPTS='--platform=linux/amd64' cross build --release --target armv7-unknown-linux-musleabihf
+mkdir -p binaries
+cp target/aarch64-unknown-linux-musl/release/pi-ups-dashboard binaries/pi-ups-dashboard-linux-aarch64-musl
+cp target/armv7-unknown-linux-musleabihf/release/pi-ups-dashboard binaries/pi-ups-dashboard-linux-armv7-musleabihf
+```
+
 ## Notes
 
 - Frontend auto-refreshes every 30 seconds.
